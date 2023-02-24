@@ -1,0 +1,418 @@
+---
+title: "A whole lotta nothing: Comparing statistical approaches to supporting the null"
+author: "Dr James Bartlett"
+format: 
+  revealjs:
+      embed-resources: true
+editor: visual
+---
+
+## Overview 
+
+* Inferences and dichotomous decisions
+
+* Target data set: *A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations*
+
+* How do our inferences change depending on the approach? 
+
+  1. Equivalence testing
+  
+  2. Bayes factors
+  
+  3. Bayesian ROPE 
+
+## Suitability of the null hypothesis in NHST 
+
+* Is the point-null plausible? Would rejecting the null be surprising? Do you want to make decisions about how to act with a given error rate? [(Lakens, 2021)](https://doi.org/10.1177/1745691620958012) 
+  
+* **Meehl's paradox**: With increasing sample size, its easier to confirm a hypothesis via rejecting a point-null ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
+
+* **Crud factor**: In non-randomised studies, we might expect non-null effects ([Orben & Lakens, 2020](https://journals.sagepub.com/doi/full/10.1177/2515245920917961)), but would they be meaningful? 
+
+## Supporting the null 
+
+* There are scenarios when supporting the null is a desirable inference 
+
+* People want to make the conclusion there is no meaningful effect, but use methods unsuited to that inference ([Aczel et al., 2018](https://doi.org/10.1177/2515245918773742))
+  
+## The role of dichotomous decisions 
+
+* We want to make decisions about whether observations fit statistical and substantive hypotheses, so its important to think about what would falsify those hypotheses
+
+![](Figures/Tunc dichotomous.PNG)
+
+*Figure from [(Tun√ß et al., 2023)](https://psyarxiv.com/af9by/)*
+
+## Approaches to probability and inference 
+
+* Frequentist 
+
+* Bayesian
+
+## Today's example
+
+```{r packages and data, warning=FALSE, message=FALSE}
+# Wrangling 
+library(tidyverse)
+library(janitor)
+# Equivalence testing 
+library(TOSTER)
+# Bayes factors 
+library(BayesFactor)
+# Bayesian modelling 
+library(brms)
+# Helper functions for Bayes
+library(bayestestR)
+
+Ditta_data <- read_csv("Data/Ditta_data.csv") %>% 
+  clean_names(case = "snake") %>% 
+  select(participant_id, condition, e3total) %>% 
+  drop_na()
+```
+
+-   *Technology or Tradition? A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations* ([Ditta & Woodward, 2022](https://psycnet.apa.org/record/2022-75571-001))
+
+  - Compared conceptual understanding of statistics at the end of a 10-week intro course
+
+  - Students completed one of two versions:
+
+      1.  Formula-based approach to statistical tests (n = 57)
+
+      2.  R code approach to statistical tests (n = 60)
+
+------------------------------------------------------------------------
+
+-   **Research question**: Does learning through hand calculations or R code lead to greater conceptual understanding of statistics?
+
+-   **Between-subjects IV**: Formula-based or R code approach course
+
+-   **DV**: Final exam (conceptual understanding questions) score as proportion correct (%)
+
+## What are we working with?
+
+```{r}
+pos <- position_dodge(0.9)
+
+Ditta_data %>% 
+  ggplot(aes(x = condition, y = e3total, fill = condition)) + 
+  geom_violin(position = pos, alpha = 0.5) +
+  geom_boxplot(width = .2, 
+               fatten = NULL, 
+               position = pos,
+               alpha = 0.5) +
+  stat_summary(fun = "mean", 
+               geom = "point", 
+               position = pos) +
+  stat_summary(fun.data = "mean_se", 
+               geom = "errorbar", 
+               width = .1,
+               position = pos) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) + 
+  scale_x_discrete(labels = c("Hand Calculations", "R Coding")) + 
+  guides(fill = "none") + 
+  theme_classic() + 
+  labs(x = "Condition", y = "Time 3 Exam Score (%)")
+```
+
+## Their main results
+
+-   Their first approach to the analysis was a simple independent samples t-test:
+
+```{r}
+t.test(e3total ~ condition, 
+       data = Ditta_data)
+```
+
+## What now?
+
+-   We can't reject the null using a traditional t-test, but how can we test if there was no meaningful difference?
+
+**Keeping frequentist**
+
+1.  Equivalence testing
+
+**Going Bayesian**
+
+2.  Bayes factors (the authors report these)
+
+3.  Bayesian Region of Practical Equivalence (ROPE)
+
+## 1. Equivalence testing
+
+-   Equivalence testing flips the NHST logic and uses one-sided t-tests to test two bounds, allowing four decisions:
+
+![](Figures/Lakens%20decisions.PNG)
+
+*Figure from [Lakens (2017)](https://doi.org/10.1177/1948550617697177)*
+
+## TOSTER R package
+
+-   Flexible package ([Lakens & Caldwell](https://cran.r-project.org/web/packages/TOSTER/index.html)) that can apply equivalence testing to focal tests like t-tests, correlations, meta-analysis
+
+-   Comes with its own power analysis functions for equivalence tests
+
+**Key decisions to make**
+
+-   What alpha to use?
+
+-   What values to use for the smallest effect size of interest bounds?
+
+---
+
+*   Using bounds of ±10%, we can conclude the effect is statistically equivalent and not significantly different to 0:
+
+```{r}
+# Summary statistics for mean, SD, and n per group 
+TOST_data <- Ditta_data %>% 
+  drop_na() %>% 
+  group_by(condition) %>% 
+  summarise(mean_score = mean(e3total),
+            sd_score = sd(e3total),
+            n = n()) %>% 
+  as.data.frame() # TOSTER does not play well with tibbles, so convert to a regular data frame 
+
+# Isolate values for group 1: hand calculations
+m1 <- TOST_data[1, 2]
+sd1 <- TOST_data[1, 3]
+n1 <- TOST_data[1, 4]
+
+# Isolate values for group 2: R
+m2 <- TOST_data[2, 2]
+sd2 <- TOST_data[2, 3]
+n2 <- TOST_data[2, 4]
+
+# Calculate equivalence test for boundaries of +/- 10%
+TOST_10 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
+          sd1 = sd1, 
+          n1 = n1,
+          m2 = m2, # Group 2: R 
+          sd2 = sd2,
+          n2 = n2, 
+          low_eqbound = -10, # User defined equivalence boundaries
+          high_eqbound = 10)
+
+TOST_10
+```
+
+------------------------------------------------------------------------
+
+-   We can also get a fancy plot showing the equivalence test for both raw and standardised units:
+
+```{r, warning=FALSE, message=FALSE}
+# Fancy plot 
+plot(TOST_10)
+```
+
+---
+
+* However, if we use bounds of ± 5%, the difference is not equivalent and not significantly different to 0 
+
+```{r}
+# Calculate equivalence test for boundaries of +/- 5%
+TOST_5 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
+          sd1 = sd1, 
+          n1 = n1,
+          m2 = m2, # Group 2: R 
+          sd2 = sd2,
+          n2 = n2, 
+          low_eqbound = -5, # User defined equivalence boundaries
+          high_eqbound = 5)
+
+plot(TOST_5)
+```
+
+## What's our inferences so far? 
+
+* **t-test**: Not significantly different to 0 
+
+* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
+
+* **Bayes factor**: ...
+
+* **Bayesian ROPE**: ...
+
+## 2. Bayes factors
+
+-   Brief overview of Bayes factors
+
+## BayesFactor R package
+
+-   Package ([Morey & Rouder, 2021](https://cran.r-project.org/web/packages/BayesFactor/index.html)) that can apply Bayes factors to t-tests, ANOVA, and regression models etc.
+
+**Key decisions to make**
+
+- What is your prior for the alternative hypothesis (Cauchy distribution over 0 where you control the width)?
+
+- One- or two-tailed test? 
+  
+---
+
+* Using the default prior, we have weak evidence in favour of the null hypothesis:
+
+```{r, warning=FALSE, message=FALSE}
+# Save Bayesfactor object
+Ditta_BF_medium <- ttestBF(formula = e3total ~ condition, 
+        data = Ditta_data,
+        rscale = "medium")
+
+# Express as in favour of the point-null
+1 / Ditta_BF_medium
+
+```
+
+------------------------------------------------------------------------
+
+- Rough guidelines ([Van Doorn et al. (2021)](https://doi.org/10.3758/s13423-020-01798-5))
+
+  - BF > 1 = Weak evidence 
+  
+  - BF > 3 = Moderate evidence 
+  
+  - BF > 10 = Strong evidence 
+  
+- We get somewhat consistent conclusions of weak to moderate evidence in favour of the null for a range of priors:
+
+```{r, warning=FALSE, message=FALSE}
+# Medium 
+medium <- as.vector(1 / Ditta_BF_medium)
+
+# Wide
+Ditta_BF_wide <- ttestBF(formula = e3total ~ condition, 
+        data = Ditta_data,
+        rscale = "wide")
+
+wide <- as.vector(1 / Ditta_BF_wide)
+
+# Ultrawide
+Ditta_BF_ultrawide <- ttestBF(formula = e3total ~ condition, 
+        data = Ditta_data,
+        rscale = "ultrawide")
+
+ultrawide <- as.vector(1 / Ditta_BF_ultrawide)
+
+knitr::kable(tribble(~"Prior", ~"Bayes factor",
+        "Medium", medium,
+        "Wide", wide,
+        "Ultrawide", ultrawide),
+        digits = 2, 
+        format = "html")
+
+```
+
+## What's our inferences so far? 
+
+* **t-test**: Not significantly different to 0 
+
+* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
+
+* **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
+
+* **Bayesian ROPE**: ...
+
+## 3. Bayesian ROPE
+
+* Outline Bayesian modelling 
+
+---
+
+* Similar to equivalence testing, creates three decisions: 1) HDI outside ROPE, 2) HDI within ROPE, 3) HDI and ROPE partially overlap
+
+![](Figures/Masharipov ROPE.PNG)
+
+*Figure from [Masharipov et al. (2021)](https://www.frontiersin.org/article/10.3389/fninf.2021.738342)*
+
+## brms and bayestestR packages
+
+* brms ([B√ºrkner, 2017](http://www.jstatsoft.org/v80/i01/)) provides flexible Bayesian modelling
+
+* bayestestR ([Makowski et al., 2019](https://joss.theoj.org/papers/10.21105/joss.01541)) for helpful summary and plotting functions 
+
+**Key decisions to make**
+
+* Prior for each parameter
+
+* Boundaries for ROPE
+
+---
+
+```{r brms setup, eval=FALSE}
+Ditta_data <- Ditta_data %>% 
+  mutate(condition = case_when(condition == "HC" ~ 0,
+                               condition == "R" ~ 1))
+
+Ditta_model <- bf(e3total ~ condition)
+
+# Default flat priors
+Ditta_fit <- brm(
+  formula = Ditta_model, # formula we defined above 
+  data = Ditta_data, # Data frame we're using 
+  family = gaussian(),
+  seed = 1908,
+  file = "Data/Ditta_model1" #Save the model as a .rds file
+)
+```
+
+* We can get a summary of our intercept and coefficient from the Bayesian regression model
+
+* The 95% HDI for the coefficient (mean difference) is entirely within ROPE bounds of ±10%,  
+
+```{r}
+# Save time by reading in saved object 
+Ditta_fit <- read_rds("Data/Ditta_model1.rds")
+
+describe_posterior(Ditta_fit, rope_range = c(-10, 10))
+
+```
+
+---
+
+* We can even demonstrate it via a fancy plot of the ROPE and posterior distribution for the coefficient
+
+```{r}
+plot(rope(Ditta_fit, range = c(-10, 10)))
+```
+
+---
+
+* Like equivalence testing though, we're undecided based on smaller ROPE bounds of ±5%, so we would need more data
+
+```{r}
+plot(rope(Ditta_fit, range = c(-5, 5)))
+```
+
+## What's our inferences so far? 
+
+* **t-test**: Not significantly different to 0 
+
+* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
+
+* **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
+
+* **Bayesian ROPE**: We can accept the ROPE of ±10% around the coefficient posterior, but not ±5%. 
+
+## Where to go next
+
+* New (work in progress) [PsyTeachR book](https://bartlettje.github.io/statsresdesign/index.html) where chapters 9 and 10 cover Bayes factors / modelling 
+
+* Comparing equivalence testing and Bayes factors ([Lakens et al., 2020](https://doi.org/10.1093/geronb/gby065))
+
+* Introduction to Bayes and ROPE ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
+
+* Comparing frequentist vs Bayesian modelling ([Flores et al., 2022](https://onlinelibrary.wiley.com/doi/abs/10.1111/bjop.12585))
+
+## Discussion
+
+* Thank you for listening! 
+
+* Any questions? 
+
+* What is your preferred approach? 
+
+## Technical details 
+
+* Equivalence testing process
+
+* What do the priors mean in BF? 
+
+* Modelling process in brms 
+
