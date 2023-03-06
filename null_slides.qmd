@@ -7,53 +7,52 @@ format:
 editor: visual
 ---
 
-## Overview 
+## Overview
 
-* Inferences and dichotomous decisions
+-   Approaches to statistical inference and wanting to test the null
 
-* Target data set: *A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations*
+-   Target data set: *A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations*
 
-* How do our inferences change depending on the approach? 
+-   How do our inferences change depending on the approach?
 
-  1. Equivalence testing
-  
-  2. Bayes factors
-  
-  3. Bayesian ROPE 
+    1.  Equivalence testing
 
-## Suitability of the null hypothesis in NHST 
+    2.  Bayes factors
 
-* Is the point-null plausible? Would rejecting the null be surprising? Do you want to make decisions about how to act with a given error rate? [(Lakens, 2021)](https://doi.org/10.1177/1745691620958012) 
-  
-* **Meehl's paradox**: With increasing sample size, its easier to confirm a hypothesis via rejecting a point-null ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
+    3.  Bayesian ROPE
 
-* **Crud factor**: In non-randomised studies, we might expect non-null effects ([Orben & Lakens, 2020](https://journals.sagepub.com/doi/full/10.1177/2515245920917961)), but would they be meaningful? 
+## Suitability of a point-null hypothesis
 
-## Supporting the null 
+-   Is the point-null plausible? Would rejecting the null be surprising? Do you want to make decisions about how to act with a given error rate? [(Lakens, 2021)](https://doi.org/10.1177/1745691620958012)
 
-* There are scenarios when supporting the null is a desirable inference 
+-   **Meehl's paradox**: With increasing sample size, its easier to confirm a hypothesis via rejecting a point-null ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
 
-* People want to make the conclusion there is no meaningful effect, but use methods unsuited to that inference ([Aczel et al., 2018](https://doi.org/10.1177/2515245918773742))
-  
-## The role of dichotomous decisions 
+-   **Crud factor**: In non-randomised studies, we might expect non-null effects ([Orben & Lakens, 2020](https://journals.sagepub.com/doi/full/10.1177/2515245920917961)), but would they be meaningful?
 
-* We want to make decisions about whether observations fit statistical and substantive hypotheses, so its important to think about what would falsify those hypotheses
+## Supporting the null
 
-![](Figures/Tunc dichotomous.PNG)
+-   There are scenarios when supporting the null is a desirable inference:
+    -   Is there no meaningful difference between two competing interventions?
+    -   Does your theory rule out specific effects?
+    -   Is your correlation too small to be meaningful?
+-   However, researchers mistakenly conclude null effects via a non-significant *p*-value ([Aczel et al., 2018](https://doi.org/10.1177/2515245918773742), [Edelsbrunner & Thurn, 2020](https://osf.io/j93a2))
 
-*Figure from [(TunÃ§ et al., 2023)](https://psyarxiv.com/af9by/)*
+## Approaches to probability and inference:
 
-## Approaches to probability and inference 
+**Frequentist**
 
-* Frequentist 
+-   Objective theory: Model parameters are fixed and are not subject to a probability distribution
 
-* Bayesian
+**Bayesian**
+
+-   Subjective theory: Model parameters are uncertain and subject to probability distributions
 
 ## Today's example
 
 ```{r packages and data, warning=FALSE, message=FALSE}
 # Wrangling 
 library(tidyverse)
+# Function for cleaning variable names up 
 library(janitor)
 # Equivalence testing 
 library(TOSTER)
@@ -63,7 +62,12 @@ library(BayesFactor)
 library(brms)
 # Helper functions for Bayes
 library(bayestestR)
+# Helper functions for plotting Bayes
+library(tidybayes)
+# Join different plots
+library(patchwork)
 
+# Load data, clean names, select relevant variables, and remove any missing values
 Ditta_data <- read_csv("Data/Ditta_data.csv") %>% 
   clean_names(case = "snake") %>% 
   select(participant_id, condition, e3total) %>% 
@@ -72,13 +76,13 @@ Ditta_data <- read_csv("Data/Ditta_data.csv") %>%
 
 -   *Technology or Tradition? A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations* ([Ditta & Woodward, 2022](https://psycnet.apa.org/record/2022-75571-001))
 
-  - Compared conceptual understanding of statistics at the end of a 10-week intro course
+-   Compared conceptual understanding of statistics at the end of a 10-week intro course
 
-  - Students completed one of two versions:
+-   Students completed one of two versions:
 
-      1.  Formula-based approach to statistical tests (n = 57)
+    1.  Formula-based approach to statistical tests (n = 57)
 
-      2.  R code approach to statistical tests (n = 60)
+    2.  R code approach to statistical tests (n = 60)
 
 ------------------------------------------------------------------------
 
@@ -90,9 +94,11 @@ Ditta_data <- read_csv("Data/Ditta_data.csv") %>%
 
 ## What are we working with?
 
-```{r}
+```{r data violin boxplot}
+# Set one value for offsetting violin and box plots
 pos <- position_dodge(0.9)
 
+# Take Ditta data and create violin boxplot 
 Ditta_data %>% 
   ggplot(aes(x = condition, y = e3total, fill = condition)) + 
   geom_violin(position = pos, alpha = 0.5) +
@@ -109,7 +115,7 @@ Ditta_data %>%
                position = pos) +
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) + 
   scale_x_discrete(labels = c("Hand Calculations", "R Coding")) + 
-  guides(fill = "none") + 
+  guides(fill = "none") + # Don't want no legend
   theme_classic() + 
   labs(x = "Condition", y = "Time 3 Exam Score (%)")
 ```
@@ -118,7 +124,8 @@ Ditta_data %>%
 
 -   Their first approach to the analysis was a simple independent samples t-test:
 
-```{r}
+```{r simple ttest}
+# Traditional independent samples t-test on DV by IV
 t.test(e3total ~ condition, 
        data = Ditta_data)
 ```
@@ -139,7 +146,7 @@ t.test(e3total ~ condition,
 
 ## 1. Equivalence testing
 
--   Equivalence testing flips the NHST logic and uses one-sided t-tests to test two bounds, allowing four decisions:
+-   Flips the NHST logic and uses one-sided t-tests (90% confidence intervals) to test your effect against two boundaries:
 
 ![](Figures/Lakens%20decisions.PNG)
 
@@ -149,22 +156,19 @@ t.test(e3total ~ condition,
 
 -   Flexible package ([Lakens & Caldwell](https://cran.r-project.org/web/packages/TOSTER/index.html)) that can apply equivalence testing to focal tests like t-tests, correlations, meta-analysis
 
--   Comes with its own power analysis functions for equivalence tests
-
 **Key decisions to make**
 
--   What alpha to use?
+-   What alpha value to use?
 
--   What values to use for the smallest effect size of interest bounds?
+-   What values to use for the smallest effect size of interest boundaries?
 
----
+------------------------------------------------------------------------
 
-*   Using bounds of ±10%, we can conclude the effect is statistically equivalent and not significantly different to 0:
+-   Using bounds of Â±10%, we can conclude the effect is statistically equivalent and not significantly different to 0:
 
-```{r}
-# Summary statistics for mean, SD, and n per group 
+```{r TOST summary stats}
+# For TOST, we need summary statistics for mean, SD, and n per group 
 TOST_data <- Ditta_data %>% 
-  drop_na() %>% 
   group_by(condition) %>% 
   summarise(mean_score = mean(e3total),
             sd_score = sd(e3total),
@@ -182,32 +186,30 @@ sd2 <- TOST_data[2, 3]
 n2 <- TOST_data[2, 4]
 
 # Calculate equivalence test for boundaries of +/- 10%
-TOST_10 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
+(TOST_10 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
           sd1 = sd1, 
           n1 = n1,
           m2 = m2, # Group 2: R 
           sd2 = sd2,
           n2 = n2, 
           low_eqbound = -10, # User defined equivalence boundaries
-          high_eqbound = 10)
-
-TOST_10
+          high_eqbound = 10))
 ```
 
 ------------------------------------------------------------------------
 
 -   We can also get a fancy plot showing the equivalence test for both raw and standardised units:
 
-```{r, warning=FALSE, message=FALSE}
-# Fancy plot 
+```{r ten point TOST plot, warning=FALSE, message=FALSE}
+# Fancy plot using the equivalence test object
 plot(TOST_10)
 ```
 
----
+------------------------------------------------------------------------
 
-* However, if we use bounds of ± 5%, the difference is not equivalent and not significantly different to 0 
+-   However, if we use bounds of Â±5%, the difference is not equivalent and not significantly different to 0
 
-```{r}
+```{r five point TOST plot}
 # Calculate equivalence test for boundaries of +/- 5%
 TOST_5 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
           sd1 = sd1, 
@@ -221,19 +223,27 @@ TOST_5 <- tsum_TOST(m1 = m1, # Group 1: Hand calculations
 plot(TOST_5)
 ```
 
-## What's our inferences so far? 
+## What's our inferences so far?
 
-* **t-test**: Not significantly different to 0 
+-   **t-test**: Not significantly different to 0
 
-* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
+-   **Equivalence test**: Statistically equivalent using bounds of Â±10%, but not Â±5%
 
-* **Bayes factor**: ...
+-   **Bayes factor**: TBD
 
-* **Bayesian ROPE**: ...
+-   **Bayesian ROPE**: TBD
 
 ## 2. Bayes factors
 
--   Brief overview of Bayes factors
+- Relative predictive performance of two competing hypotheses ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
+
+- How much should we shift our prior belief between two competing hypotheses after observing data? 
+
+- Typically comparing a null model vs an alternative model 
+
+  - BF~10~ = 4.57 would mean data 4.57 times more likely under alternative model than the null model
+
+  - BF~01~ = 2.34 would mean data 2.34 times more likely under null model than the alternative model
 
 ## BayesFactor R package
 
@@ -241,19 +251,19 @@ plot(TOST_5)
 
 **Key decisions to make**
 
-- What is your prior for the alternative hypothesis (Cauchy distribution over 0 where you control the width)?
+-   What is your prior for the alternative hypothesis?
 
-- One- or two-tailed test? 
-  
----
+-   What level of evidence would be convincing?
 
-* Using the default prior, we have weak evidence in favour of the null hypothesis:
+------------------------------------------------------------------------
 
-```{r, warning=FALSE, message=FALSE}
+-   Using the default prior, we have weak evidence in favour of the null hypothesis:
+
+```{r default bayes factor, warning=FALSE, message=FALSE}
 # Save Bayesfactor object
 Ditta_BF_medium <- ttestBF(formula = e3total ~ condition, 
         data = Ditta_data,
-        rscale = "medium")
+        rscale = "medium") # r = 0.707
 
 # Express as in favour of the point-null
 1 / Ditta_BF_medium
@@ -262,34 +272,38 @@ Ditta_BF_medium <- ttestBF(formula = e3total ~ condition,
 
 ------------------------------------------------------------------------
 
-- Rough guidelines ([Van Doorn et al. (2021)](https://doi.org/10.3758/s13423-020-01798-5))
+-   Rough strength of evidence guidelines ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
 
-  - BF > 1 = Weak evidence 
-  
-  - BF > 3 = Moderate evidence 
-  
-  - BF > 10 = Strong evidence 
-  
-- We get somewhat consistent conclusions of weak to moderate evidence in favour of the null for a range of priors:
+-   BF \> 1 = Weak evidence
 
-```{r, warning=FALSE, message=FALSE}
-# Medium 
+-   BF \> 3 = Moderate evidence
+
+-   BF \> 10 = Strong evidence
+
+-   We get somewhat consistent conclusions of weak to moderate evidence in favour of the null:
+
+```{r compare BF across priors, warning=FALSE, message=FALSE}
+# Going to save the results for all three preset priors
+
+# Save medium prior results
+# as.vector as BF objects save in a weird format 
 medium <- as.vector(1 / Ditta_BF_medium)
 
-# Wide
+# Save wide prior results 
 Ditta_BF_wide <- ttestBF(formula = e3total ~ condition, 
         data = Ditta_data,
         rscale = "wide")
 
 wide <- as.vector(1 / Ditta_BF_wide)
 
-# Ultrawide
+# Save ultrawide prior results 
 Ditta_BF_ultrawide <- ttestBF(formula = e3total ~ condition, 
         data = Ditta_data,
         rscale = "ultrawide")
 
 ultrawide <- as.vector(1 / Ditta_BF_ultrawide)
 
+# Make pretty html table to show BF for each prior 
 knitr::kable(tribble(~"Prior", ~"Bayes factor",
         "Medium", medium,
         "Wide", wide,
@@ -299,120 +313,328 @@ knitr::kable(tribble(~"Prior", ~"Bayes factor",
 
 ```
 
-## What's our inferences so far? 
+## What's our inferences so far?
 
-* **t-test**: Not significantly different to 0 
+-   **t-test**: Not significantly different to 0
 
-* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
+-   **Equivalence test**: Statistically equivalent using bounds of Â±10%, but not Â±5
 
-* **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
+-   **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
 
-* **Bayesian ROPE**: ...
+-   **Bayesian ROPE**: TBD
+
+## Bayesian modelling
+
+-   Applies Bayesian inference to regression models (e.g., [Heino et al., 2018](https://doi.org/10.1080/21642850.2018.1428102))
+
+    -   Define a descriptive model of parameters
+
+    -   Specify prior probability distributions for model parameters
+
+    -   Update prior to posterior distributions using Bayesian inference
+
+    -   Interpret model and parameter posterior distributions
 
 ## 3. Bayesian ROPE
 
-* Outline Bayesian modelling 
+-   Compares parameter posterior distributions to a rejection region
 
----
+-   Similar to equivalence testing, creates three decisions: 1) HDI outside ROPE, 2) HDI within ROPE, 3) HDI and ROPE partially overlap
 
-* Similar to equivalence testing, creates three decisions: 1) HDI outside ROPE, 2) HDI within ROPE, 3) HDI and ROPE partially overlap
-
-![](Figures/Masharipov ROPE.PNG)
+![](Figures/Masharipov%20ROPE.PNG)
 
 *Figure from [Masharipov et al. (2021)](https://www.frontiersin.org/article/10.3389/fninf.2021.738342)*
 
 ## brms and bayestestR packages
 
-* brms ([BÃ¼rkner, 2017](http://www.jstatsoft.org/v80/i01/)) provides flexible Bayesian modelling
+-   brms ([BÃ¼rkner, 2017](http://www.jstatsoft.org/v80/i01/)) provides flexible Bayesian modelling
 
-* bayestestR ([Makowski et al., 2019](https://joss.theoj.org/papers/10.21105/joss.01541)) for helpful summary and plotting functions 
+-   bayestestR ([Makowski et al., 2019](https://joss.theoj.org/papers/10.21105/joss.01541)) for helpful summary and plotting functions
 
 **Key decisions to make**
 
-* Prior for each parameter
+-   Prior for each parameter
 
-* Boundaries for ROPE
+-   Boundaries for ROPE
 
----
+------------------------------------------------------------------------
 
 ```{r brms setup, eval=FALSE}
+# brms models can take a while to run, so to speed up rendering each time, eval = FALSE
+# You can still run manually, but it doesn't run on knitting
+
+# Dummy code condition so HC is reference, R is target
 Ditta_data <- Ditta_data %>% 
   mutate(condition = case_when(condition == "HC" ~ 0,
                                condition == "R" ~ 1))
 
+# Simple linear regression: final exam outcome by categorical condition predictor
 Ditta_model <- bf(e3total ~ condition)
 
-# Default flat priors
+# Default flat priors - do not specify prior argument, see technical details later for informed priors
 Ditta_fit <- brm(
+  formula = Ditta_model, # formula we defined above 
+  data = Ditta_data, # Data frame we're using 
+  family = gaussian(), # Assume normal linear regression
+  seed = 1908, # Set seed for reproducibility
+  file = "Data/Ditta_model1" #Save the model as a .rds file to read in later
+)
+```
+
+-   We can get a summary of our intercept and coefficient from the Bayesian regression model
+
+-   The 95% HDI for the coefficient (mean difference) is entirely within ROPE bounds of Â±10%:
+
+```{r describe default model ROPE}
+# Save time by reading in saved object 
+Ditta_fit <- read_rds("Data/Ditta_model1.rds")
+
+# Describe posterior summarises model parameters, but limit which to present nicely in a slide 
+model1_summary <- describe_posterior(Ditta_fit, 
+                                     rope_range = c(-10, 10)) %>% # ROPE range of -10 to 10
+  select(Parameter, Median, CI_low, CI_high, ROPE_Percentage)
+
+# Relabel manually to look nicer in the table 
+model1_summary[1, 1] <- "Intercept"
+model1_summary[2, 1] <- "Condition"
+
+# Make pretty html table 
+knitr::kable(
+  model1_summary, 
+  digits = 2, 
+  col.names = c("Parameter", "Median", "Lower 95% CI", "Higher 95% CI", "ROPE %"))
+
+```
+
+------------------------------------------------------------------------
+
+-   We can even demonstrate it via a fancy plot of the ROPE and posterior distribution for the coefficient
+
+```{r ROPE plot ten points}
+# rope() on its own reports the % of posterior in ROPE, within plot, it visualises it 
+plot(rope(Ditta_fit, 
+          range = c(-10, 10)))
+```
+
+------------------------------------------------------------------------
+
+-   Like equivalence testing though, we're undecided based on smaller ROPE bounds of Â±5%, so we would need more data:
+
+```{r ROPE plot five points}
+plot(rope(Ditta_fit, 
+          range = c(-5, 5)))
+```
+
+## What's our inferences so far?
+
+-   **t-test**: Not significantly different to 0
+
+-   **Equivalence test**: Statistically equivalent using bounds of Â±10%, but not Â±5%
+
+-   **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
+
+-   **Bayesian ROPE**: We can accept the ROPE of Â±10% around the coefficient posterior, but not Â±5%.
+
+## Summary 
+
+* RQ: There was no meaningful difference between a formula based and r code based course on conceptual understanding of statistics
+
+* Across frequentist and Bayesian approaches, we get pretty similar conclusions, but decisions in data analysis *did* affect the conclusions: 
+
+  - What boundaries do you use for the smallest effect size of interest? 
+  
+  - What prior would you use for the alternative hypothesis when calculating Bayes factors? 
+
+## Where to go next
+
+-   New (work in progress) [PsyTeachR book](https://bartlettje.github.io/statsresdesign/index.html) where chapters 9 and 10 cover Bayes factors / modelling
+
+-   Comparing equivalence testing and Bayes factors ([Lakens et al., 2020](https://doi.org/10.1093/geronb/gby065))
+
+-   Introduction to Bayes and ROPE ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
+
+-   Comparing frequentist vs Bayesian modelling ([Flores et al., 2022](https://onlinelibrary.wiley.com/doi/abs/10.1111/bjop.12585))
+
+## Discussion
+
+**Thank you for listening!**
+
+Any questions?
+
+-   What is your preferred approach to statistical inference?
+
+-   What approaches have you used to argue there was no meaningful effect?
+
+# Technical details
+
+## Bayes factor priors
+
+```{r cauchy vs normal distributions}
+# Figure from my PsyTeachR book 
+
+set.seed(17829)
+
+alpha <- 0.4
+
+# Set labels for scale parameter we're using 
+labels <- c("0.707 (medium)", "1 (wide)", "1.41 (ultrawide)")
+
+# Simulate loads of values from cauchy or normal distribution 
+# 10,000 for each scale parameter around 0 
+cauchy_dat <- data.frame(size = as.factor(rep(labels, 1e5)), 
+                         value = rcauchy(3e5, 0, c(0.707, 1, 1.41)))
+
+normal_dat <- data.frame(size = as.factor(rep(labels, 1e5)), 
+                         value = rnorm(3e5, 0, c(0.707, 1, 1.41)))
+
+# Save recurring plotting layers to save repetition 
+plot_list <- list(scale_x_continuous(limits = c(-5, 5), breaks = seq(-5, 5, 1)), 
+  theme_classic(),
+  labs(x = "Standardised Units", y = "Density"),
+  theme(legend.position = "bottom",
+        legend.title = element_text(size=7),
+        legend.text = element_text(size=7)))
+
+# Plot values as density plot separated by scale factor
+cauchy_plot <- cauchy_dat %>% 
+  ggplot(aes(x = value, fill = size)) + 
+  geom_density(alpha = alpha) + 
+  scale_fill_viridis_d(begin = 0.2, end = 0.8, option = "D", name = "r scale") + 
+  plot_list + 
+  labs(title = "Cauchy Distribution")
+
+normal_plot <- normal_dat %>% 
+  ggplot(aes(x = value, fill = size)) + 
+  geom_density(alpha = alpha) + 
+  scale_fill_viridis_d(begin = 0.2, end = 0.8, option = "D", name = "SD") + 
+  plot_list + 
+  labs(title = "Normal Distribution")
+
+# Patchwork to show them side by side
+cauchy_plot + normal_plot
+```
+
+## Priors for Bayesian modelling
+
+```{r brms visualise default prior}
+
+# Visualise default prior on intercept 
+prior <- prior(student_t(3, 75, 8.9), class = Intercept) # Set prior and class
+
+# distribution plot from tidybayes to parse and show named prior 
+Intercept_prior <- prior %>% 
+  parse_dist() %>% # Function from tidybayes/ggdist to turn prior into a dataframe
+  ggplot(aes(y = 0, dist = .dist, args = .args, fill = prior)) + # Fill in details from prior and add fill
+  stat_slab(normalize = "panels") + # ggdist layer to visualise distributions
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # Add colour scheme
+  guides(fill = "none") + # Remove legend for fill
+  labs(x = "Value", y = "Density", title = "brms default priors", subtitle = paste0(prior$class, ": ", prior$prior)) + # Name by prior class and specified prior
+  theme_classic()
+
+# Visualise default flat prior on coefficient
+prior <- prior(normal(0, 10000), class = b) # Set prior and class
+
+b_prior <- prior %>% 
+  parse_dist() %>% # Function from tidybayes/ggdist to turn prior into a dataframe
+  ggplot(aes(y = 0, dist = .dist, args = .args, fill = prior)) + # Fill in details from prior and add fill
+  stat_slab(normalize = "panels") + # ggdist layer to visualise distributions
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # Add colour scheme
+  guides(fill = "none") + # Remove legend for fill
+  labs(x = "Value", y = "Density", subtitle = paste0(prior$class, ": ", prior$prior)) +
+  theme_classic() + 
+  coord_cartesian(xlim = c(-100, 100)) # Trick to show flat prior - across a huge range but limit to smaller scale
+
+Intercept_prior + b_prior
+
+```
+
+------------------------------------------------------------------------
+
+```{r brms visualise informed priors}
+# Same process as before, but this time on informed priors
+
+# Nothing else to go on, so most likely value 50% in the middle 
+# SD = 16 limits the range to roughly 0 to 100 for what values are possible 
+prior <- prior(normal(50, 16), class = Intercept) # Set prior and class
+
+Intercept_prior <- prior %>% 
+  parse_dist() %>% # Function from tidybayes/ggdist to turn prior into a dataframe
+  ggplot(aes(y = 0, dist = .dist, args = .args, fill = prior)) + # Fill in details from prior and add fill
+  stat_slab(normalize = "panels") + # ggdist layer to visualise distributions
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # Add colour scheme
+  guides(fill = "none") + # Remove legend for fill
+  labs(x = "Value", y = "Density", title = "brms user priors", subtitle = paste0(prior$class, ": ", prior$prior)) +
+  theme_classic()
+
+# Similar for coefficient. Nothing specific to go on, so centre on 0 for shrinkage
+# Effects could be positive or negative, but unlikely to be more than Â± 10%
+prior <- prior(normal(0, 3), class = b) # Set prior and class
+
+b_prior <- prior %>% 
+  parse_dist() %>% # Function from tidybayes/ggdist to turn prior into a dataframe
+  ggplot(aes(y = 0, dist = .dist, args = .args, fill = prior)) + # Fill in details from prior and add fill
+  stat_slab(normalize = "panels") + # ggdist layer to visualise distributions
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # Add colour scheme
+  guides(fill = "none") + # Remove legend for fill
+  labs(x = "Value", y = "Density", subtitle = paste0(prior$class, ": ", prior$prior)) +
+  theme_classic()
+
+Intercept_prior + b_prior
+```
+
+## Informed priors
+
+```{r brms informed prior model, eval=FALSE, echo=TRUE}
+# Don't run again, but this time specify our informed priors
+
+Ditta_model <- bf(e3total ~ condition)
+
+Ditta_priors <- c(prior(normal(50, 16), class = Intercept),
+                  prior(normal(0, 3), class = b))
+
+# Default flat priors
+Ditta_fit2 <- brm(
+  prior = Ditta_priors, # Specify informed priors
   formula = Ditta_model, # formula we defined above 
   data = Ditta_data, # Data frame we're using 
   family = gaussian(),
   seed = 1908,
-  file = "Data/Ditta_model1" #Save the model as a .rds file
+  file = "Data/Ditta_model2" #Save the model as a .rds file
 )
 ```
 
-* We can get a summary of our intercept and coefficient from the Bayesian regression model
+------------------------------------------------------------------------
 
-* The 95% HDI for the coefficient (mean difference) is entirely within ROPE bounds of ±10%,  
+```{r informed model summary}
+# Read in saved model again
+Ditta_fit2 <- read_rds("Data/Ditta_model2.rds")
 
-```{r}
-# Save time by reading in saved object 
-Ditta_fit <- read_rds("Data/Ditta_model1.rds")
+# Save key values from summary
+model2_summary <- describe_posterior(Ditta_fit2, rope_range = c(-10, 10)) %>% 
+  select(Parameter, Median, CI_low, CI_high, ROPE_Percentage)
 
-describe_posterior(Ditta_fit, rope_range = c(-10, 10))
+# Compare side by side model 1 and 2 to see how priors change things
+summary_models <- bind_rows(model1_summary, model2_summary)
 
+# Relabel and add label for model
+summary_models[3, 1] <- "Intercept"
+summary_models[4, 1] <- "Condition"
+summary_models$Model <- rep(c("Default priors", "User priors"), each = 2)
+
+# Reorder variables and arrange so parameters are next to each other
+summary_models <- summary_models %>% 
+  select(Model, Parameter, Median, CI_low, CI_high, ROPE_Percentage) %>% 
+  arrange(desc(Parameter), Model)
+
+knitr::kable(
+  summary_models, 
+  digits = 2, 
+  col.names = c("Model", "Parameter", "Median", "Lower 95% CI", "Higher 95% CI", "ROPE %"))
 ```
 
----
+------------------------------------------------------------------------
 
-* We can even demonstrate it via a fancy plot of the ROPE and posterior distribution for the coefficient
-
-```{r}
-plot(rope(Ditta_fit, range = c(-10, 10)))
+```{r informed model 1 ROPE range}
+plot(rope(Ditta_fit2, 
+          range = c(-10, 10)))
 ```
-
----
-
-* Like equivalence testing though, we're undecided based on smaller ROPE bounds of ±5%, so we would need more data
-
-```{r}
-plot(rope(Ditta_fit, range = c(-5, 5)))
-```
-
-## What's our inferences so far? 
-
-* **t-test**: Not significantly different to 0 
-
-* **Equivalence test**: Statistically equivalent using bounds of ±10%, but not ±5%
-
-* **Bayes factor**: Weak to moderate evidence in favour of the null hypothesis compared to the alternative
-
-* **Bayesian ROPE**: We can accept the ROPE of ±10% around the coefficient posterior, but not ±5%. 
-
-## Where to go next
-
-* New (work in progress) [PsyTeachR book](https://bartlettje.github.io/statsresdesign/index.html) where chapters 9 and 10 cover Bayes factors / modelling 
-
-* Comparing equivalence testing and Bayes factors ([Lakens et al., 2020](https://doi.org/10.1093/geronb/gby065))
-
-* Introduction to Bayes and ROPE ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
-
-* Comparing frequentist vs Bayesian modelling ([Flores et al., 2022](https://onlinelibrary.wiley.com/doi/abs/10.1111/bjop.12585))
-
-## Discussion
-
-* Thank you for listening! 
-
-* Any questions? 
-
-* What is your preferred approach? 
-
-## Technical details 
-
-* Equivalence testing process
-
-* What do the priors mean in BF? 
-
-* Modelling process in brms 
-
