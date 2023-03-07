@@ -11,7 +11,7 @@ editor: visual
 
 -   Approaches to statistical inference and wanting to test the null
 
--   Target data set: *A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations*
+-   Target data set: *A Comparison of Students' Statistical Reasoning After Being Taught With R Programming Versus Hand Calculations* ([Ditta & Woodward, 2022](https://psycnet.apa.org/record/2022-75571-001))
 
 -   How do our inferences change depending on the approach?
 
@@ -23,7 +23,7 @@ editor: visual
 
 ## Suitability of a point-null hypothesis
 
--   Is the point-null plausible? Would rejecting the null be surprising? Do you want to make decisions about how to act with a given error rate? [(Lakens, 2021)](https://doi.org/10.1177/1745691620958012)
+-   **NHST**: Is the point-null plausible? Do you want to make decisions about how to act with a given error rate? [(Lakens, 2021)](https://doi.org/10.1177/1745691620958012)
 
 -   **Meehl's paradox**: With increasing sample size, its easier to confirm a hypothesis via rejecting a point-null ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
 
@@ -39,13 +39,11 @@ editor: visual
 
 ## Approaches to probability and inference:
 
-**Frequentist**
+Simplest distinction between the approaches [(VanderPlas, 2015)](http://jakevdp.github.io/blog/2015/08/07/frequentism-and-bayesianism-5-model-selection/ ):
 
--   Objective theory: Model parameters are fixed and are not subject to a probability distribution
+-   **Frequentist**: Objective theory - Model parameters are fixed and are not subject to a probability distribution
 
-**Bayesian**
-
--   Subjective theory: Model parameters are uncertain and subject to probability distributions
+-   **Bayesian**: Subjective theory -  Model parameters are uncertain and subject to probability distributions
 
 ## Today's example
 
@@ -86,11 +84,13 @@ Ditta_data <- read_csv("Data/Ditta_data.csv") %>%
 
 ------------------------------------------------------------------------
 
--   **Research question**: Does learning through hand calculations or R code lead to greater conceptual understanding of statistics?
+- **Research question (RQ)**: Does learning through hand calculations or R code lead to greater conceptual understanding of statistics?
 
--   **Between-subjects IV**: Formula-based or R code approach course
+- **Between-subjects IV**: Formula-based or R code approach course
 
--   **DV**: Final exam (conceptual understanding questions) score as proportion correct (%)
+- **DV**: Final exam (conceptual understanding questions) score as proportion correct (%)
+
+- Keep in mind the distinction between the RQ/design and the inferences we can make
 
 ## What are we working with?
 
@@ -235,15 +235,15 @@ plot(TOST_5)
 
 ## 2. Bayes factors
 
-- Relative predictive performance of two competing hypotheses ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
+-   Relative predictive performance of two competing hypotheses ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
 
-- How much should we shift our prior belief between two competing hypotheses after observing data? 
+-   How much should we shift our prior belief between two competing hypotheses after observing data?
 
-- Typically comparing a null model vs an alternative model 
+-   Typically comparing a null model vs an alternative model
 
-  - BF~10~ = 4.57 would mean data 4.57 times more likely under alternative model than the null model
+    -   BF~10~ = 4.57 would mean data 4.57 times more likely under alternative model than the null model
 
-  - BF~01~ = 2.34 would mean data 2.34 times more likely under null model than the alternative model
+    -   BF~01~ = 2.34 would mean data 2.34 times more likely under null model than the alternative model
 
 ## BayesFactor R package
 
@@ -272,15 +272,15 @@ Ditta_BF_medium <- ttestBF(formula = e3total ~ condition,
 
 ------------------------------------------------------------------------
 
--   Rough strength of evidence guidelines ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
+* Strength of evidence guidelines ([Van Doorn et al., 2021](https://doi.org/10.3758/s13423-020-01798-5))
 
--   BF \> 1 = Weak evidence
+  - BF > 1 = Weak evidence
 
--   BF \> 3 = Moderate evidence
+  - BF > 3 = Moderate evidence
 
--   BF \> 10 = Strong evidence
+  - BF > 10 = Strong evidence
 
--   We get somewhat consistent conclusions of weak to moderate evidence in favour of the null:
+* We get somewhat consistent conclusions of weak to moderate evidence in favour of the null:
 
 ```{r compare BF across priors, warning=FALSE, message=FALSE}
 # Going to save the results for all three preset priors
@@ -325,19 +325,19 @@ knitr::kable(tribble(~"Prior", ~"Bayes factor",
 
 ## Bayesian modelling
 
--   Applies Bayesian inference to regression models (e.g., [Heino et al., 2018](https://doi.org/10.1080/21642850.2018.1428102))
+- Applies Bayesian inference to regression models ([Heino et al., 2018](https://doi.org/10.1080/21642850.2018.1428102)):
 
-    -   Define a descriptive model of parameters
+    - Define a descriptive model of parameters
 
-    -   Specify prior probability distributions for model parameters
+    - Specify prior probability distributions for model parameters
 
-    -   Update prior to posterior distributions using Bayesian inference
+    - Update prior to posterior distributions using Bayesian inference
 
-    -   Interpret model and parameter posterior distributions
+    - Interpret model and parameter posterior distributions
 
 ## 3. Bayesian ROPE
 
--   Compares parameter posterior distributions to a rejection region
+-   Compares the mass (typically a 95% highest density interval / HDI) of parameter posterior distribution to a rejection region
 
 -   Similar to equivalence testing, creates three decisions: 1) HDI outside ROPE, 2) HDI within ROPE, 3) HDI and ROPE partially overlap
 
@@ -402,7 +402,7 @@ model1_summary[2, 1] <- "Condition"
 knitr::kable(
   model1_summary, 
   digits = 2, 
-  col.names = c("Parameter", "Median", "Lower 95% CI", "Higher 95% CI", "ROPE %"))
+  col.names = c("Parameter", "Median", "Lower 95% HDI", "Higher 95% HDI", "ROPE %"))
 
 ```
 
@@ -435,15 +435,15 @@ plot(rope(Ditta_fit,
 
 -   **Bayesian ROPE**: We can accept the ROPE of ±10% around the coefficient posterior, but not ±5%.
 
-## Summary 
+## Summary
 
-* RQ: There was no meaningful difference between a formula based and r code based course on conceptual understanding of statistics
+-   RQ: There was no meaningful difference between a formula-based and R code-based course, but question marks on what we can learn from the design
 
-* Across frequentist and Bayesian approaches, we get pretty similar conclusions, but decisions in data analysis *did* affect the conclusions: 
+-   Across frequentist and Bayesian approaches, we get pretty similar conclusions, but decisions in data analysis *did* affect the conclusions:
 
-  - What boundaries do you use for the smallest effect size of interest? 
-  
-  - What prior would you use for the alternative hypothesis when calculating Bayes factors? 
+    -   What boundaries do you use for the smallest effect size of interest?
+
+    -   What prior would you use for the alternative hypothesis when calculating Bayes factors?
 
 ## Where to go next
 
@@ -453,6 +453,8 @@ plot(rope(Ditta_fit,
 
 -   Introduction to Bayes and ROPE ([Kruschke & Liddell, 2018](http://link.springer.com/10.3758/s13423-017-1272-1))
 
+- Bayesian modelling process ([Heino et al., 2018](https://doi.org/10.1080/21642850.2018.1428102))
+
 -   Comparing frequentist vs Bayesian modelling ([Flores et al., 2022](https://onlinelibrary.wiley.com/doi/abs/10.1111/bjop.12585))
 
 ## Discussion
@@ -461,9 +463,11 @@ plot(rope(Ditta_fit,
 
 Any questions?
 
--   What is your preferred approach to statistical inference?
+- What is your preferred approach to statistical inference?
 
--   What approaches have you used to argue there was no meaningful effect?
+- How would you set smallest effect size of interest boundaries? 
+
+- What approaches have you used to argue there was no meaningful effect?
 
 # Technical details
 
