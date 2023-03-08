@@ -18,7 +18,7 @@ In the Github repo, there are two key files:
 
 - null_slides.html - These are the rendered verison of the slides which you can view via Github pages: https://bartlettje.github.io/null_demo/null_slides.html
 
-- null_slides.qmd - This is the background Quarto file I used to create the slides and apply the analysis techniques. If you want to try the methods out yourself, the data is available in the data folder from Ditta and Woodward's OSF project. You can then see the commented code for running the analyses. 
+- null_slides.qmd - This is the background Quarto file I used to create the slides and apply the analysis techniques. If you want to try the methods out yourself, the data is available in the [data folder from Ditta and Woodward's OSF project](https://osf.io/rnkfa). Please download the data from their OSF project first as they admirably shared the data for their study. I renamed the file `Ditta_data.csv`, but you will need to edit the file name on line 69 if you call it something else. You can then see the commented code for running the analyses. 
 
 # References
 
