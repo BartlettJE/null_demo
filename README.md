@@ -1,4 +1,4 @@
-# Topic of the talk 
+# A whole lotta nothing: Comparing statistical approaches to supporting the null
 
 Talk for the [Methods and Metascience group](https://psyteachr.github.io/mms/) at the University of Glasgow. 
 
